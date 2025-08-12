@@ -1,0 +1,150 @@
+prefixes:
+  crm:  "http://www.cidoc-crm.org/cidoc-crm/"
+  dig:  "http://www.cidoc-crm.org/cidoc-crm-dig/"
+  rdf:  "http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+  rdfs: "http://www.w3.org/2000/01/rdf-schema#"
+  skos: "http://www.w3.org/2004/02/skos/core#"
+
+# Javad Transformation Object – mapping catalogue
+# (?s ?p ?o) triples whose ?p equals `source_predicate`
+# are expanded with the SPARQL in `target_pattern`.
+
+rules:
+  # ───────────────────────────────────────────────────────────────────────
+  # Dublin Core / DCTerms
+  # ───────────────────────────────────────────────────────────────────────
+  - id: dc_title
+    source_predicate: "http://purl.org/dc/elements/1.1/title"
+    target_pattern: |
+      ?s crm:P102_has_title [
+          a crm:E35_Title ;
+          rdf:value ?o
+      ] .
+
+  - id: dcterms_title
+    source_predicate: "http://purl.org/dc/terms/title"
+    target_pattern: |
+      ?s crm:P102_has_title [
+          a crm:E35_Title ;
+          rdf:value ?o
+      ] .
+
+  - id: dc_identifier
+    source_predicate: "http://purl.org/dc/elements/1.1/identifier"
+    target_pattern: |
+      ?s crm:P1_is_identified_by [
+          a crm:E42_Identifier ;
+          rdf:value ?o
+      ] .
+
+  - id: dcterms_date
+    source_predicate: "http://purl.org/dc/terms/date"
+    target_pattern: |
+      ?s crm:P4_has_time-span [
+          a crm:E52_Time-Span ;
+          crm:P82a_begin_of_the_begin ?o ;
+          crm:P82b_end_of_the_end ?o
+      ] .
+
+  # ───────────────────────────────────────────────────────────────────────
+  # Fedora / LDP structural relations
+  # ───────────────────────────────────────────────────────────────────────
+  - id: ldp_contains
+    source_predicate: "http://www.w3.org/ns/ldp#contains"
+    target_pattern: |
+      ?s crm:P46_is_composed_of ?o .
+
+  - id: fedora_created
+    source_predicate: "http://fedora.info/definitions/v4/repository#created"
+    target_pattern: |
+      _:evt a dig:D7_Digital_Machine_Event ;
+          crm:P4_has_time-span [
+              a crm:E52_Time-Span ;
+              crm:P82a_begin_of_the_begin ?o ;
+              crm:P82b_end_of_the_end ?o
+          ] ;
+          crm:P94_has_created ?s .
+      ?s dig:L11i_was_output_of _:evt .
+
+  # Fedora binary size
+  - id: premis_size
+    source_predicate: "http://www.loc.gov/premis/rdf/v1#hasSize"
+    target_pattern: |
+      ?s dig:L43_has_byte_size ?o .
+
+  # ───────────────────────────────────────────────────────────────────────
+  # MIME type
+  # ───────────────────────────────────────────────────────────────────────
+  - id: ebucore_mime
+    source_predicate: "http://www.ebu.ch/metadata/ontologies/ebucore/ebucore#hasMimeType"
+    target_pattern: |
+      ?s crm:P2_has_type [
+          a crm:E55_Type ;
+          crm:P1_is_identified_by [
+              a crm:E41_Appellation ;
+              rdf:value ?o
+          ]
+      ] .
+
+  # ───────────────────────────────────────────────────────────────────────
+  # EXIF / TIFF technical metadata
+  # ───────────────────────────────────────────────────────────────────────
+  # Pixel dimensions
+  - id: exif_width
+    source_predicate: "http://wwww3org/2003/12/exif/ns#imageWidth"
+    target_pattern: |
+      ?s dig:L57_has_pixel_width ?o .
+
+  - id: exif_height
+    source_predicate: "http://wwww3org/2003/12/exif/ns#imageLength"
+    target_pattern: |
+      ?s dig:L56_has_pixel_height ?o .
+
+  # Bit-depth
+  - id: exif_bits
+    source_predicate: "http://wwww3org/2003/12/exif/ns#bitsPerSample"
+    target_pattern: |
+      ?s dig:L54_has_bit_depth ?o .
+
+  # Scanner / capture software + hardware           (> identifiers)
+  - id: exif_document_name
+    source_predicate: "http://wwww3org/2003/12/exif/ns#documentName"
+    target_pattern: |
+      ?s crm:P1_is_identified_by [
+          a crm:E42_Identifier ;
+          rdf:value ?o
+      ] .
+
+  - id: exif_make
+    source_predicate: "http://wwww3org/2003/12/exif/ns#make"
+    target_pattern: |
+      ?s dig:L16_used_hardware [
+          a dig:D14_Software ;
+          crm:P2_has_type [
+              a crm:E55_Type ;
+              rdf:value ?o
+          ]
+      ] .
+
+  - id: exif_model
+    source_predicate: "http://wwww3org/2003/12/exif/ns#model"
+    target_pattern: |
+      ?s dig:L16_used_hardware [
+          a dig:D14_Software ;
+          crm:P1_is_identified_by [
+              a crm:E41_Appellation ;
+              rdf:value ?o
+          ]
+      ] .
+
+  - id: exif_software
+    source_predicate: "http://wwww3org/2003/12/exif/ns#software"
+    target_pattern: |
+      ?s dig:L14_used_software [
+          a dig:D14_Software ;
+          crm:P1_is_identified_by [
+              a crm:E41_Appellation ;
+              rdf:value ?o
+          ]
+      ] .
+

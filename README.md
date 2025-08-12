@@ -37,12 +37,12 @@ This example runs the pipeline, processing up to 100 resources from the specifie
 **Bash:**
 ```bash
 python etl_pipeline.py \
-  --fedora-base https://your-fedora-instance.com/repo/rest \
-  --root-path   path/to/your/data \
+  --fedora-base https://datavault.ficlit.unibo.it/repo/rest \
+  --root-path   UBOBU/MICROFILM \
   --rules-file  rules.yaml \
   --out-dir     sparql_out \
-  --username    your_user \
-  --password    your_password \
+  --username    [Auth_user] \
+  --password    [Auth_pass] \
   --chunk-size  5000 \
   --max-resources 100 -v
 ```
@@ -50,12 +50,12 @@ python etl_pipeline.py \
 **PowerShell:**
 ```powershell
 python etl_pipeline.py `
-  --fedora-base https://your-fedora-instance.com/repo/rest `
-  --root-path   path/to/your/data `
+  --fedora-base https://datavault.ficlit.unibo.it/repo/rest `
+  --root-path   UBOBU/MICROFILM `
   --rules-file  rules.yaml `
   --out-dir     sparql_out `
-  --username    your_user `
-  --password    your_password `
+  --username    [Auth_user] `
+  --password    [Auth_pass] ` 
   --chunk-size  5000 `
   --max-resources 100 -v
 ```

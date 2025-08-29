@@ -1,0 +1,20 @@
+# Ignore project-local docs bucket
+.ignore/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+
+# Virtual environments
+.venv/
+
+# OS/editor cruft
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Project outputs
+sparql_out/
+

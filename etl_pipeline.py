@@ -30,6 +30,7 @@ python etl_pipeline.py \
   --root-path   UBOBU/MICROFILM \
   --rules-file  rules.yaml \
   --out-dir     sparql_out \
+  --named-graph http://datavault.ficlit.unibo.it/graph/microfilm \
   --username    [Auth_user] \
   --password    [Auth_pass] \
   --chunk-size  5000 \
@@ -42,6 +43,7 @@ python etl_pipeline.py `
   --root-path   UBOBU/MICROFILM `
   --rules-file  rules.yaml `
   --out-dir     sparql_out `
+  --named-graph http://datavault.ficlit.unibo.it/graph/microfilm `
   --username    [Auth_user] `
   --password    [Auth_pass] ` 
   --chunk-size  5000 `

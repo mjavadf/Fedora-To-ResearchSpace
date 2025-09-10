@@ -56,6 +56,7 @@ python etl_pipeline.py -v `
   --root-path UBOBU/MICROFILM/UBO8306198/402163/UBOBU_UBO8306198_402163_0015/ `
   --rules-file rules.yaml `
   --out-dir sparql_out `
+  --named-graph http://datavault.ficlit.unibo.it/graph/microfilm `
   --username [Auth_user] `
   --password [Auth_pass] `
   --max-resources 1
@@ -153,8 +154,11 @@ def apply_rules(src: rdflib.Graph, rules) -> List[str]:
     for s, p, o in src:
         rule = rules.get(str(p))
         if not rule:
-            continue
-        out.append(rule["template"].replace("?s", s.n3()).replace("?o", o.n3()).rstrip())
+            # If no rule is found, keep the original triple.
+            out.append(f"{s.n3()} {p.n3()} {o.n3()} .")
+        else:
+            # If a rule is found, apply the transformation.
+            out.append(rule["template"].replace("?s", s.n3()).replace("?o", o.n3()).rstrip())
     logger.debug("Generated %d target triples", len(out))
     return out
 
@@ -172,7 +176,7 @@ PREFIX_BLOCK = textwrap.dedent(
 )
 
 
-def flush_chunk(src_blocks: List[str], tgt_triples: List[str], out_dir: Path, idx: int) -> None:
+def flush_chunk(src_blocks: List[str], tgt_triples: List[str], out_dir: Path, idx: int, graph_uri: str) -> None:
     if not tgt_triples:
         return
 
@@ -186,11 +190,12 @@ def flush_chunk(src_blocks: List[str], tgt_triples: List[str], out_dir: Path, id
     rq_path = out_dir / f"insert-{idx:03d}.rq"
     sparql = textwrap.dedent(
         f"""{PREFIX_BLOCK}
-        INSERT DATA {{
-            GRAPH <http://example.org/datavault> {{
+        INSERT DATA {{ 
+            GRAPH <{graph_uri}> {{
         {textwrap.indent(trig_content, ' ' * 12)}
             }}
-        }};"""
+        }};
+        """
     )
     rq_path.write_text(sparql, encoding="utf-8")
 
@@ -206,7 +211,7 @@ def flush_chunk(src_blocks: List[str], tgt_triples: List[str], out_dir: Path, id
 # Crawl / transform loop
 # ---------------------------------------------------------------------------
 
-def crawl(base: str, root: str, rules, out: Path, chunk: int, session: requests.Session, max_res: int):
+def crawl(base: str, root: str, rules, out: Path, chunk: int, session: requests.Session, max_res: int, graph_uri: str):
     queue = deque([f"{base.rstrip('/')}/{root.lstrip('/')}"])
     processed = 0
     chunk_idx = 1
@@ -235,12 +240,12 @@ def crawl(base: str, root: str, rules, out: Path, chunk: int, session: requests.
         processed += 1
 
         if processed % chunk == 0:
-            flush_chunk(src_buf, tgt_buf, out, chunk_idx)
+            flush_chunk(src_buf, tgt_buf, out, chunk_idx, graph_uri)
             src_buf.clear()
             tgt_buf.clear()
             chunk_idx += 1
 
-    flush_chunk(src_buf, tgt_buf, out, chunk_idx)
+    flush_chunk(src_buf, tgt_buf, out, chunk_idx, graph_uri)
 
     logger.info(
         "Finished: %d resources → %d chunks in %.1f s (limit=%s)",
@@ -258,6 +263,7 @@ def parse_cli(argv=None):
     ap = argparse.ArgumentParser(description="Fedora → ResearchSpace ETL (dev edition)")
     ap.add_argument("--fedora-base", required=True)
     ap.add_argument("--root-path", required=True)
+    ap.add_argument("--named-graph", required=True, help="Target named graph URI for the INSERT query.")
     ap.add_argument("--rules-file", default="rules.yaml")
     ap.add_argument("--out-dir", default="sparql_out", type=Path)
     ap.add_argument("--chunk-size", default=10000, type=int)
@@ -294,10 +300,12 @@ def main(argv=None):
             args.chunk_size,
             session,
             args.max_resources,
+            args.named_graph,
         )
     except KeyboardInterrupt:
         logger.warning("Interrupted by user → exiting…")
         sys.exit(130)
+
 
 
 if __name__ == "__main__":

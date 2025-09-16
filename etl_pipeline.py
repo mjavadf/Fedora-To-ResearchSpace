@@ -141,26 +141,41 @@ def fetch_rdf(uri: str, session: requests.Session) -> rdflib.Graph:
 # Rule handling
 # ---------------------------------------------------------------------------
 
-def load_rules(path: Path) -> Dict[str, Dict[str, str]]:
+def load_rules(path: Path):
     data = yaml.safe_load(path.read_text(encoding="utf-8"))
-    rules = {
-        r["source_predicate"]: {"id": r["id"], "template": r["target_pattern"]}
-        for r in data["rules"]
-    }
-    logger.info("Loaded %d mapping rules from %s", len(rules), path)
-    return rules
+    out = []
+    for r in data["rules"]:
+        out.append({
+            "id": r.get("id"),
+            "predicate": r.get("source_predicate"),
+            "object_equals": r.get("object_equals"),  # optional
+            "template": r.get("target_pattern"),
+        })
+    logger.info("Loaded %d mapping rules from %s", len(out), path)
+    return out
+
 
 
 def apply_rules(src: rdflib.Graph, rules) -> List[str]:
     out: List[str] = []
     for s, p, o in src:
-        rule = rules.get(str(p))
-        if not rule:
-            # If no rule is found, keep the original triple.
-            out.append(f"{s.n3()} {p.n3()} {o.n3()} .")
+        p_str = str(p)
+        o_str = str(o) if isinstance(o, rdflib.term.Identifier) else None
+
+        exact = [r for r in rules if r["predicate"] == p_str and r.get("object_equals") == o_str]
+        loose = [r for r in rules if r["predicate"] == p_str and r.get("object_equals") is None]
+        picked = exact or loose
+
+        if picked:
+            for r in picked:
+                out.append(
+                    r["template"]
+                    .replace("?s", s.n3())
+                    .replace("?o", o.n3())
+                    .rstrip()
+                )
         else:
-            # If a rule is found, apply the transformation.
-            out.append(rule["template"].replace("?s", s.n3()).replace("?o", o.n3()).rstrip())
+            out.append(f"{s.n3()} {p.n3()} {o.n3()} .")
     logger.debug("Generated %d target triples", len(out))
     return out
 
@@ -174,6 +189,9 @@ PREFIX_BLOCK = textwrap.dedent(
     PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
     PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
     PREFIX skos: <http://www.w3.org/2004/02/skos/core#>
+    PREFIX ex:  <http://www.researchspace.org/ontology/>
+    PREFIX prov: <http://www.w3.org/ns/prov#>
+    PREFIX ldp: <http://www.w3.org/ns/ldp#>
     """
 )
 

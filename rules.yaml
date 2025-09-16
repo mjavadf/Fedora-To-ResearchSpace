@@ -8,6 +8,7 @@ prefixes:
   ebucore: "http://www.ebu.ch/metadata/ontologies/ebucore/ebucore#"
   premis:  "http://www.loc.gov/premis/rdf/v1#"
   exif:    "http://wwww3org/2003/12/exif/ns#"
+  ex:   "http://www.researchspace.org/ontology/"
 
 # Javad Transformation Object – ResearchSpace-aligned mapping catalogue
 
@@ -37,6 +38,19 @@ rules:
           crm:P82b_end_of_the_end ?o
       ] .
 
+  # -----
+  #type
+
+  # http://www.w3.org/ns/ldp#RDFSource -> http://www.cidoc-crm.org/cidoc-crm/E31_Document , http://www.cidoc-crm.org/cidoc-crm/E24_Physical_Man-Made_Thing
+  # - id: ldp_rdfsource
+  #   source_predicate: "http://www.w3.org/1999/02/22-rdf-syntax-ns#type"
+  #   source_object: "http://www.w3.org/ns/ldp#RDFSource"
+  #   target_pattern: |
+  #     ?s a crm:E31_Document , crm:E24_Physical_Man-Made_Thing .
+
+
+  # http://www.w3.org/ns/ldp#NonRDFSource -> http://www.researchspace.org/ontology/EX_Digital_Image
+  # ldp:contains -> http://www.cidoc-crm.org/cidoc-crm/P138i_has_representation 
   # ────────────────────────────────────────────────
   # Binary size
   # ────────────────────────────────────────────────
@@ -183,3 +197,63 @@ rules:
           crm:P82a_begin_of_the_begin ?o ;
           crm:P82b_end_of_the_end ?o
       ] .
+
+  # ────────────────────────────────────────────────
+  # TODO
+  # ────────────────────────────────────────────────
+    # rdf:type + ldp:RDFSource  →  E31 + E24
+  - id: ldp_rdfsource_is_document_and_manmade
+    source_predicate: "http://www.w3.org/1999/02/22-rdf-syntax-ns#type"
+    object_equals:    "http://www.w3.org/ns/ldp#RDFSource"
+    target_pattern: |
+      ?s a crm:E31_Document .
+      ?s a crm:E24_Physical_Man-Made_Thing .
+
+  # rdf:type + ldp:NonRDFSource  →  EX_Digital_Image
+  - id: ldp_nonrdfsource_is_digital_image
+    source_predicate: "http://www.w3.org/1999/02/22-rdf-syntax-ns#type"
+    object_equals:    "http://www.w3.org/ns/ldp#NonRDFSource"
+    target_pattern: |
+      ?s a ex:EX_Digital_Image .
+
+  # ldp:contains  →  P138i_has_representation
+  - id: ldp_contains_to_representation
+    source_predicate: "http://www.w3.org/ns/ldp#contains"
+    target_pattern: |
+      ?s crm:P138i_has_representation ?o .
+
+  - id: dc_title_label
+    source_predicate: "http://purl.org/dc/elements/1.1/title"
+    target_pattern: |
+      ?s rdfs:label ?o .
+      ?s crm:P102_has_title [
+          a crm:E35_Title ;
+          rdf:value ?o
+      ] .
+
+  - id: dcterms_title_label
+    source_predicate: "http://purl.org/dc/terms/title"
+    target_pattern: |
+      ?s rdfs:label ?o .
+      ?s crm:P102_has_title [
+          a crm:E35_Title ;
+          rdf:value ?o
+      ] .
+
+  - id: binary_created_prov
+    source_predicate: "http://fedora.info/definitions/v4/repository#created"
+    target_pattern: |
+      ?s prov:generatedAtTime ?o .
+      ?s prov:wasAttributedTo <http://www.researchspace.org/resource/user/admin> .
+      ?s a ex:EX_File, prov:Entity, ldp:Resource .
+
+  - id: ebucore_filename_px_name_and_label
+    source_predicate: "http://www.ebu.ch/metadata/ontologies/ebucore/ebucore#filename"
+    target_pattern: |
+      ?s ex:PX_has_file_name ?o .
+      ?s rdfs:label ?o .
+
+  - id: ebucore_mime_px_media_type
+    source_predicate: "http://www.ebu.ch/metadata/ontologies/ebucore/ebucore#hasMimeType"
+    target_pattern: |
+      ?s ex:PX_has_media_type ?o .

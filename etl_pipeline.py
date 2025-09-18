@@ -119,14 +119,13 @@ def _download(uri: str, session: requests.Session) -> str:
     return resp.text
 
 
-def fetch_rdf(uri: str, session: requests.Session) -> rdflib.Graph:
-    """Fetch RDF, retrying the `/fcr:metadata` endpoint for binaries."""
+def fetch_rdf(uri: str, session: requests.Session) -> tuple[rdflib.Graph, str]:
     logger.debug("Fetching %s", uri)
     try:
         data = _download(uri, session)
     except (NotRDF, requests.HTTPError):
         if uri.rstrip("/").endswith("fcr:metadata"):
-            raise  # already at metadata endpoint – give up
+            raise
         alt_uri = uri.rstrip("/") + "/fcr:metadata"
         logger.debug("  ⇢ retrying metadata endpoint %s", alt_uri)
         data = _download(alt_uri, session)
@@ -135,7 +134,7 @@ def fetch_rdf(uri: str, session: requests.Session) -> rdflib.Graph:
     g = rdflib.Graph()
     g.parse(data=data, format="turtle", publicID=uri)
     logger.debug("Parsed %d triples from %s", len(g), uri)
-    return g
+    return g, uri
 
 # ---------------------------------------------------------------------------
 # Rule handling
@@ -155,12 +154,33 @@ def load_rules(path: Path):
     return out
 
 
+def _derive_filename_from_uri(subject_uri: str, mime: str = "image/jpeg") -> str:
+    """Build deterministic filename from entity URI (force .jpg extension)."""
+    rel_path = subject_uri.split("/repo/rest/")[-1]
+    return f"/data/images/file/{rel_path}.jpg"
+
 
 def apply_rules(src: rdflib.Graph, rules) -> List[str]:
     out: List[str] = []
+    mime_lookup: Dict[str, str] = {}
+
+    # collect mime types for better extension guessing
+    for s, p, o in src:
+        if str(p) == "http://www.ebu.ch/metadata/ontologies/ebucore/ebucore#hasMimeType":
+            mime_lookup[str(s)] = str(o)
+
     for s, p, o in src:
         p_str = str(p)
         o_str = str(o) if isinstance(o, rdflib.term.Identifier) else None
+
+        # Special handling for ebucore:filename
+        if p_str == "http://www.ebu.ch/metadata/ontologies/ebucore/ebucore#filename":
+            if not o_str or o_str.strip().strip('"') == "":
+                mime = mime_lookup.get(str(s), "image/jpeg")
+                file_name = _derive_filename_from_uri(str(s), mime)
+                out.append(f"{s.n3()} ex:PX_has_file_name \"{file_name}\" .")
+                out.append(f"{s.n3()} rdfs:label \"{file_name}\" .")
+                continue
 
         exact = [r for r in rules if r["predicate"] == p_str and r.get("object_equals") == o_str]
         loose = [r for r in rules if r["predicate"] == p_str and r.get("object_equals") is None]
@@ -237,6 +257,7 @@ def crawl(base: str, root: str, rules, out: Path, chunk: int, session: requests.
     chunk_idx = 1
     tgt_buf: List[str] = []
     src_buf: List[str] = []
+    file_urls: List[str] = []
     out.mkdir(parents=True, exist_ok=True)
 
     t0 = time.perf_counter()
@@ -244,7 +265,7 @@ def crawl(base: str, root: str, rules, out: Path, chunk: int, session: requests.
     while queue and (max_res == 0 or processed < max_res):
         uri = queue.popleft()
         try:
-            g_src = fetch_rdf(uri, session)
+            g_src, final_uri = fetch_rdf(uri, session)
         except Exception as exc:
             logger.error("Failed to fetch %s – %s", uri, exc)
             continue
@@ -259,6 +280,10 @@ def crawl(base: str, root: str, rules, out: Path, chunk: int, session: requests.
         tgt_buf.extend(apply_rules(g_src, rules))
         processed += 1
 
+        if final_uri.endswith("/fcr:metadata"):
+            file_url = final_uri.rsplit("/fcr:metadata", 1)[0]
+            file_urls.append(file_url)
+
         if processed % chunk == 0:
             flush_chunk(src_buf, tgt_buf, out, chunk_idx, graph_uri)
             src_buf.clear()
@@ -266,6 +291,11 @@ def crawl(base: str, root: str, rules, out: Path, chunk: int, session: requests.
             chunk_idx += 1
 
     flush_chunk(src_buf, tgt_buf, out, chunk_idx, graph_uri)
+
+    if file_urls:
+        files_path = out / "files.txt"
+        files_path.write_text("\n".join(file_urls), encoding="utf-8")
+        logger.info("Wrote %d file URLs to %s", len(file_urls), files_path)
 
     logger.info(
         "Finished: %d resources → %d chunks in %.1f s (limit=%s)",
@@ -325,7 +355,6 @@ def main(argv=None):
     except KeyboardInterrupt:
         logger.warning("Interrupted by user → exiting…")
         sys.exit(130)
-
 
 
 if __name__ == "__main__":
